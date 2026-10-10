@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Virtual Campus Open House</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #111; color: #fff; }
+      #ui-overlay {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        z-index: 999; background: rgba(0, 0, 0, 0.8); padding: 15px; border-radius: 8px;
+        width: 90%; max-width: 600px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      }
+      .panel-hidden { display: none !important; }
+      #info-panel {
+        position: fixed; top: 20px; right: 20px; z-index: 999;
+        background: rgba(20, 20, 20, 0.95); padding: 20px; border-radius: 8px;
+        width: 300px; border: 1px solid #444;
+      }
+      input, button { padding: 8px; margin-top: 5px; border-radius: 4px; border: none; }
+      input { width: 70%; background: #222; color: #fff; border: 1px solid #555; }
+      button { background: #007bff; color: white; cursor: pointer; }
+      button:hover { background: #0056b3; }
+    </style>
+  </head>
+  <body>
+    <!-- VR Scene -->
+    <a-scene>
+      <a-sky color="#87CEEB"></a-sky>
+      <a-plane rotation="-90 0 0" width="50" height="50" color="#7bc8a4"></a-plane>
+
+      <!-- Camera & Mouse Cursor (Fixed) -->
+      <a-entity camera position="0 1.6 5">
+        <a-cursor cursor="rayOrigin: mouse" raycaster="objects: .clickable" color="#ff0000"></a-cursor>
+      </a-entity>
+
+      <!-- Lighting -->
+      <a-light type="directional" color="#ffffff" intensity="0.8" position="-1 2 1"></a-light>
+      <a-light type="ambient" color="#bbb"></a-light>
+
+      <!-- Buildings -->
+      <a-entity position="-5 0 -8">
+        <a-box class="clickable hotspot" data-id="main" position="0 1.5 0" width="3" height="3" depth="3" color="#4A90E2"
+               animation__enter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+               animation__leave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"></a-box>
+        <a-cone position="0 3.5 0" radius-bottom="2.2" height="1.5" color="#D0021B"></a-cone>
+        <a-box position="0 0.5 1.51" width="0.8" height="1.2" depth="0.1" color="#333"></a-box>
+        <a-text value="Main Admin" position="-1.2 4.5 0" color="#000" scale="1.5 1.5 1.5"></a-text>
+      </a-entity>
+
+      <a-entity position="5 0 -8">
+        <a-box class="clickable hotspot" data-id="library" position="0 1.5 0" width="3.5" height="3" depth="3" color="#F5A623"
+               animation__enter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+               animation__leave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"></a-box>
+        <a-text value="Library" position="-0.8 3.5 0" color="#000" scale="1.5 1.5 1.5"></a-text>
+      </a-entity>
+
+      <a-entity position="-5 0 -3">
+        <a-box class="clickable hotspot" data-id="lab" position="0 1.5 0" width="3" height="2.5" depth="3" color="#7ED321"
+               animation__enter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+               animation__leave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"></a-box>
+        <a-text value="Computer Lab" position="-1.5 3.2 0" color="#000" scale="1.5 1.5 1.5"></a-text>
+      </a-entity>
+
+      <a-entity position="5 0 -3">
+        <a-box class="clickable hotspot" data-id="chapel" position="0 1.5 0" width="3" height="2.5" depth="3" color="#BD10E0"
+               animation__enter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+               animation__leave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"></a-box>
+        <a-text value="Chapel & Gym" position="-1.5 3.2 0" color="#000" scale="1.5 1.5 1.5"></a-text>
+      </a-entity>
+
+      <!-- Teleport Ground Markers -->
+      <a-circle class="clickable teleport" data-pos="0 1.6 1" radius="0.8" rotation="-90 0 0" position="0 0.01 2" color="#ffffff"></a-circle>
+      <a-text value="Teleport Here" position="-0.8 0.1 2.8" rotation="-90 0 0" color="#000" scale="1 1 1"></a-text>
+    </a-scene>
+
+    <!-- In-Scene Building Info Panel -->
+    <div id="info-panel" class="panel-hidden">
+      <h3 id="panel-title">Building Name</h3>
+      <p id="panel-desc">Description goes here...</p>
+      <button onclick="closePanel()">Close</button>
+    </div>
+
+    <!-- AI Tour Guide UI Overlay -->
+    <div id="ui-overlay">
+      <h3>🤖 AI Tour Guide</h3>
+      <input type="text" id="question-input" placeholder="Ask about admissions, courses, labs...">
+      <button onclick="askAI()">Ask Guide</button>
+      <p id="ai-response" style="font-style: italic; margin-top: 8px; color: #a0e0ff;"></p>
+      <p style="margin-top: 5px; font-size: 12px;"><a href="/admin.html" target="_blank" style="color: #4da6ff;">Open Admin Dashboard</a></p>
+    </div>
+
+    <script>
+      let hotspotsData = [];
+
+      fetch('/api/hotspots')
+        .then(res => res.json())
+        .then(data => { hotspotsData = data; });
+
+      document.querySelectorAll('.hotspot').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-id');
+          const match = hotspotsData.find(h => h.id === id);
+          if (match) {
+            document.getElementById('panel-title').innerText = match.name;
+            document.getElementById('panel-desc').innerText = match.description;
+            document.getElementById('info-panel').classList.remove('panel-hidden');
+            
+            fetch('/api/visits', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ hotspotId: id })
+            });
+          }
+        });
+      });
+
+      function closePanel() {
+        document.getElementById('info-panel').classList.add('panel-hidden');
+      }
+
+      document.querySelectorAll('.teleport').forEach(el => {
+        el.addEventListener('click', () => {
+          const targetPos = el.getAttribute('data-pos');
+          const cameraEl = document.querySelector('a-entity[camera]');
+          cameraEl.setAttribute('position', targetPos);
+        });
+      });
+
+      async function askAI() {
+        const q = document.getElementById('question-input').value;
+        const resBox = document.getElementById('ai-response');
+        if (!q) return;
+        resBox.innerText = "Thinking...";
+        try {
+          const res = await fetch('/api/guide', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: q })
+          });
+          const data = await res.json();
+          resBox.innerText = data.answer || data.error;
+        } catch (err) {
+          resBox.innerText = "Failed to reach AI tour guide.";
+        }
+      }
+    </script>
+  </body>
+</html>
